@@ -5,12 +5,10 @@ db = SQLAlchemy()
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)
+    username = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     phone = db.Column(db.String(15))
-    password = db.Column(db.String(100), nullable=False)
-    api_key = db.Column(db.String(120), unique=True, nullable=False) 
-
+    password = db.Column(db.String(100))
 
 class Log(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -19,7 +17,6 @@ class Log(db.Model):
     status = db.Column(db.String(20))  # Safe, Flagged, DDoS
     confidence = db.Column(db.Float)
     details = db.Column(db.Text)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 class Setting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
