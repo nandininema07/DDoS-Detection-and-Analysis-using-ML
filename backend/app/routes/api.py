@@ -1,8 +1,10 @@
+# app/routes/api.py
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 import joblib
 import pandas as pd
 import os
+from app.models import db, User, Log, Setting
 
 api_bp = Blueprint("api", __name__)
 
@@ -10,20 +12,29 @@ api_bp = Blueprint("api", __name__)
 model = joblib.load("app/ml/model.pkl")
 scaler = joblib.load("app/ml/scaler.pkl")
 
-# In-memory logs and user info (mock database)
-logs = []
-blacklist = set()
-
 @api_bp.route("/api/signup", methods=["POST"])
 def signup():
     data = request.json
-    # Store user in DB (mock response)
+    if User.query.filter_by(email=data["email"]).first():
+        return jsonify({"error": "Email already exists"}), 409
+
+    new_user = User(
+        username=data["username"],
+        email=data["email"],
+        phone=data.get("phone"),
+        password=data["password"]  # In production, hash passwords!
+    )
+    db.session.add(new_user)
+    db.session.commit()
     return jsonify({"message": "User signed up successfully"}), 201
 
 @api_bp.route("/api/login", methods=["POST"])
 def login():
     data = request.json
-    return jsonify({"token": "mock-jwt-token"})
+    user = User.query.filter_by(email=data["email"]).first()
+    if user and user.password == data["password"]:
+        return jsonify({"token": "mock-jwt-token", "user": user.username})
+    return jsonify({"error": "Invalid credentials"}), 401
 
 @api_bp.route("/api/detect", methods=["POST"])
 def detect():
@@ -34,56 +45,81 @@ def detect():
         pred = model.predict(X)[0]
         confidence = model.predict_proba(X)[0].max()
 
-        log = {
-            "ip": input_data.get("Src IP", "unknown"),
-            "datetime": datetime.now().isoformat(),
-            "status": "DDoS" if pred == 1 else "Safe",
-            "confidence": float(confidence),
-            "details": input_data
-        }
+        status = "DDoS" if pred == 1 else "Safe"
+        ip = input_data.get("Src IP", "unknown")
 
-        logs.append(log)
-        if pred == 1:
-            blacklist.add(log["ip"])
+        log = Log(
+            ip=ip,
+            status=status,
+            confidence=float(confidence),
+            details=str(input_data)
+        )
+        db.session.add(log)
+        db.session.commit()
 
         return jsonify({
-            "result": log["status"].lower(),
+            "result": status.lower(),
             "confidence": round(confidence, 4),
-            "ip": log["ip"]
+            "ip": ip
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/api/logs", methods=["GET"])
 def get_logs():
-    return jsonify(logs[::-1])  # latest first
+    all_logs = Log.query.order_by(Log.datetime.desc()).all()
+    return jsonify([
+        {
+            "ip": log.ip,
+            "datetime": log.datetime.isoformat(),
+            "status": log.status,
+            "confidence": log.confidence,
+            "details": log.details
+        } for log in all_logs
+    ])
 
 @api_bp.route("/api/blacklist", methods=["GET"])
 def get_blacklist():
-    flagged = [log for log in logs if log["ip"] in blacklist]
-    return jsonify(flagged[::-1])
+    flagged = Log.query.filter(Log.status != "Safe").order_by(Log.datetime.desc()).all()
+    return jsonify([
+        {
+            "ip": log.ip,
+            "datetime": log.datetime.isoformat(),
+            "status": log.status,
+            "action": "Blocked" if log.status == "DDoS" else "Flagged"
+        } for log in flagged
+    ])
 
 @api_bp.route("/api/logs/<ip>", methods=["GET"])
 def log_details(ip):
-    details = [log for log in logs if log["ip"] == ip]
-    return jsonify(details)
+    details = Log.query.filter_by(ip=ip).order_by(Log.datetime.desc()).all()
+    return jsonify([
+        {
+            "ip": log.ip,
+            "datetime": log.datetime.isoformat(),
+            "status": log.status,
+            "confidence": log.confidence,
+            "details": log.details
+        } for log in details
+    ])
 
 @api_bp.route("/api/notifications", methods=["GET"])
 def get_notifications():
-    notif = [
+    notif_logs = Log.query.filter(Log.status != "Safe").order_by(Log.datetime.desc()).all()
+    return jsonify([
         {
-            "action": log["status"],
-            "ip": log["ip"],
-            "datetime": log["datetime"],
-            "reason": f"Detected with {round(log['confidence']*100, 2)}% confidence",
+            "action": log.status,
+            "ip": log.ip,
+            "datetime": log.datetime.isoformat(),
+            "reason": f"Detected with {round(log.confidence * 100, 2)}% confidence",
             "mail_sent": True,
             "call_status": "Success"
-        } for log in logs if log["status"] != "Safe"
-    ]
-    return jsonify(notif[::-1])
+        } for log in notif_logs
+    ])
 
 @api_bp.route("/api/profile", methods=["GET"])
 def get_profile():
+    # For demo, returning mock user
     return jsonify({
         "username": "Nandini",
         "email": "nandini@example.com",
@@ -93,4 +129,16 @@ def get_profile():
 @api_bp.route("/api/settings", methods=["POST"])
 def update_settings():
     data = request.json
+    setting = Setting.query.filter_by(user_id=data["user_id"]).first()
+    if not setting:
+        setting = Setting(user_id=data["user_id"])
+        db.session.add(setting)
+
+    setting.website_url = data.get("website_url")
+    setting.alert_email = data.get("alert_email")
+    setting.alert_phone = data.get("alert_phone")
+    setting.email_alerts = data.get("email_alerts", True)
+    setting.call_alerts = data.get("call_alerts", False)
+
+    db.session.commit()
     return jsonify({"message": "Settings updated successfully"})
