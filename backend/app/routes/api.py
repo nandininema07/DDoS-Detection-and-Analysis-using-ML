@@ -4,6 +4,7 @@ from datetime import datetime
 import joblib
 import pandas as pd
 import os
+import uuid
 from app.models import db, User, Log, Setting
 
 api_bp = Blueprint("api", __name__)
@@ -18,26 +19,37 @@ def signup():
     if User.query.filter_by(email=data["email"]).first():
         return jsonify({"error": "Email already exists"}), 409
 
+    api_key = str(uuid.uuid4())
     new_user = User(
         username=data["username"],
         email=data["email"],
         phone=data.get("phone"),
-        password=data["password"]  # In production, hash passwords!
+        password=data["password"],  # In production, hash passwords!
+        api_key=api_key
     )
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({"message": "User signed up successfully"}), 201
+    return jsonify({"message": "User signed up successfully", "api_key": api_key}), 201
 
 @api_bp.route("/api/login", methods=["POST"])
 def login():
     data = request.json
     user = User.query.filter_by(email=data["email"]).first()
     if user and user.password == data["password"]:
-        return jsonify({"token": "mock-jwt-token", "user": user.username})
+        return jsonify({"token": user.api_key, "user": user.username})
     return jsonify({"error": "Invalid credentials"}), 401
 
 @api_bp.route("/api/detect", methods=["POST"])
 def detect():
+    api_key = request.headers.get("Authorization")
+    if not api_key or not api_key.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid API key"}), 401
+
+    api_key = api_key.split("Bearer ")[-1].strip()
+    user = User.query.filter_by(api_key=api_key).first()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
     try:
         input_data = request.json
         df = pd.DataFrame([input_data])
@@ -52,7 +64,8 @@ def detect():
             ip=ip,
             status=status,
             confidence=float(confidence),
-            details=str(input_data)
+            details=str(input_data),
+            user_id=user.id
         )
         db.session.add(log)
         db.session.commit()
@@ -67,7 +80,16 @@ def detect():
 
 @api_bp.route("/api/logs", methods=["GET"])
 def get_logs():
-    all_logs = Log.query.order_by(Log.datetime.desc()).all()
+    api_key = request.headers.get("Authorization")
+    if not api_key or not api_key.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid API key"}), 401
+
+    api_key = api_key.split("Bearer ")[-1].strip()
+    user = User.query.filter_by(api_key=api_key).first()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    all_logs = Log.query.filter_by(user_id=user.id).order_by(Log.datetime.desc()).all()
     return jsonify([
         {
             "ip": log.ip,
@@ -80,7 +102,16 @@ def get_logs():
 
 @api_bp.route("/api/blacklist", methods=["GET"])
 def get_blacklist():
-    flagged = Log.query.filter(Log.status != "Safe").order_by(Log.datetime.desc()).all()
+    api_key = request.headers.get("Authorization")
+    if not api_key or not api_key.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid API key"}), 401
+
+    api_key = api_key.split("Bearer ")[-1].strip()
+    user = User.query.filter_by(api_key=api_key).first()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    flagged = Log.query.filter(Log.user_id == user.id, Log.status != "Safe").order_by(Log.datetime.desc()).all()
     return jsonify([
         {
             "ip": log.ip,
@@ -92,7 +123,16 @@ def get_blacklist():
 
 @api_bp.route("/api/logs/<ip>", methods=["GET"])
 def log_details(ip):
-    details = Log.query.filter_by(ip=ip).order_by(Log.datetime.desc()).all()
+    api_key = request.headers.get("Authorization")
+    if not api_key or not api_key.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid API key"}), 401
+
+    api_key = api_key.split("Bearer ")[-1].strip()
+    user = User.query.filter_by(api_key=api_key).first()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    details = Log.query.filter_by(user_id=user.id, ip=ip).order_by(Log.datetime.desc()).all()
     return jsonify([
         {
             "ip": log.ip,
@@ -105,7 +145,16 @@ def log_details(ip):
 
 @api_bp.route("/api/notifications", methods=["GET"])
 def get_notifications():
-    notif_logs = Log.query.filter(Log.status != "Safe").order_by(Log.datetime.desc()).all()
+    api_key = request.headers.get("Authorization")
+    if not api_key or not api_key.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid API key"}), 401
+
+    api_key = api_key.split("Bearer ")[-1].strip()
+    user = User.query.filter_by(api_key=api_key).first()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    notif_logs = Log.query.filter(Log.user_id == user.id, Log.status != "Safe").order_by(Log.datetime.desc()).all()
     return jsonify([
         {
             "action": log.status,
@@ -119,7 +168,6 @@ def get_notifications():
 
 @api_bp.route("/api/profile", methods=["GET"])
 def get_profile():
-    # For demo, returning mock user
     return jsonify({
         "username": "Nandini",
         "email": "nandini@example.com",
