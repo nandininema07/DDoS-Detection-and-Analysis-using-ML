@@ -3,6 +3,7 @@ import requests
 url = "http://localhost:5000/api/detect"
 
 sample_input = {
+    "Src IP": "192.168.1.1",
     "Destination Port": 80,
     "Flow Duration": 100000,
     "Total Fwd Packets": 12,

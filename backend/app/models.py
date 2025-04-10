@@ -11,7 +11,9 @@ class User(db.Model):
     phone = db.Column(db.String(15))
     password = db.Column(db.String(100))  # Store hashed password
     api_key = db.Column(db.String(36), unique=True, nullable=False)
-    settings = db.relationship('Setting', backref='user', lazy=True)  # Relationship with Settings
+    
+    # Changed backref to 'user_settings' to avoid conflict
+    settings = db.relationship('Setting', backref='user_settings', lazy=True)  # Unique backref here
     logs = db.relationship('Log', backref='user', lazy=True)  # Relationship with Logs
 
     def __repr__(self):
@@ -39,7 +41,9 @@ class Setting(db.Model):
     alert_phone = db.Column(db.String(15))
     email_alerts = db.Column(db.Boolean, default=True)
     call_alerts = db.Column(db.Boolean, default=False)
-    user = db.relationship('User', backref=db.backref('settings', lazy=True))
+    
+    # Remove the backref here, since it's already handled in User model
+    user = db.relationship('User', foreign_keys=[user_id])
 
     def __repr__(self):
         return f'<Setting {self.website_url} - {self.user.username}>'
