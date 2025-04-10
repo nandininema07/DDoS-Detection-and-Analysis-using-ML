@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DDoS Detection Test</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #f2f2f2;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    button {
+      padding: 0.5rem 1rem;
+      background: #1e90ff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      margin-top: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0b70d0;
+    }
+    #response {
+      margin-top: 2rem;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>🛡️ DDoS Detection</h2>
+    <p>Click the button to simulate traffic and check for DDoS.</p>
+
+    <button onclick="sendDetection()">Simulate Traffic</button>
+
+    <div id="response"></div>
+  </div>
+
+  <script>
+    async function sendDetection() {
+      const responseDiv = document.getElementById("response");
+
+      const data = {
+        "Src IP": "192.168.1.100",
+  "Destination Port": 80,
+  "Flow Duration": 123456,
+  "Total Fwd Packets": 10,
+  "Total Backward Packets": 5,
+  "Total Length of Fwd Packets": 1000,
+  "Total Length of Bwd Packets": 500,
+  "Fwd Packet Length Max": 200,
+  "Fwd Packet Length Min": 100,
+  "Fwd Packet Length Mean": 150,
+  "Fwd Packet Length Std": 20,
+  "Bwd Packet Length Max": 180,
+  "Bwd Packet Length Min": 90,
+  "Bwd Packet Length Mean": 120,
+  "Bwd Packet Length Std": 15,
+  "Flow Bytes/s": 1234.5,
+  "Flow Packets/s": 12.3,
+  "Flow IAT Mean": 10,
+  "Flow IAT Std": 1,
+  "Flow IAT Max": 15,
+  "Flow IAT Min": 5,
+  "Fwd IAT Total": 500,
+  "Fwd IAT Mean": 25,
+  "Fwd IAT Std": 3,
+  "Fwd IAT Max": 30,
+  "Fwd IAT Min": 10,
+  "Bwd IAT Total": 300,
+  "Bwd IAT Mean": 20,
+  "Bwd IAT Std": 2,
+  "Bwd IAT Max": 25,
+  "Bwd IAT Min": 5,
+  "Fwd PSH Flags": 0,
+  "Bwd PSH Flags": 0,
+  "Fwd URG Flags": 0,
+  "Bwd URG Flags": 0,
+  "Fwd Header Length": 40,
+  "Bwd Header Length": 40,
+  "Fwd Packets/s": 6,
+  "Bwd Packets/s": 3,
+  "Min Packet Length": 50,
+  "Max Packet Length": 250,
+  "Packet Length Mean": 150,
+  "Packet Length Std": 30,
+  "Packet Length Variance": 900,
+  "FIN Flag Count": 0,
+  "SYN Flag Count": 1,
+  "RST Flag Count": 0,
+  "PSH Flag Count": 0,
+  "ACK Flag Count": 1,
+  "URG Flag Count": 0,
+  "CWE Flag Count": 0,
+  "ECE Flag Count": 0,
+  "Down/Up Ratio": 0.5,
+  "Average Packet Size": 160,
+  "Avg Fwd Segment Size": 100,
+  "Avg Bwd Segment Size": 80,
+  "Fwd Header Length.1": 40,
+  "Fwd Avg Bytes/Bulk": 0,
+  "Fwd Avg Packets/Bulk": 0,
+  "Fwd Avg Bulk Rate": 0,
+  "Bwd Avg Bytes/Bulk": 0,
+  "Bwd Avg Packets/Bulk": 0,
+  "Bwd Avg Bulk Rate": 0,
+  "Subflow Fwd Packets": 10,
+  "Subflow Fwd Bytes": 1000,
+  "Subflow Bwd Packets": 5,
+  "Subflow Bwd Bytes": 500,
+  "Init_Win_bytes_forward": 256,
+  "Init_Win_bytes_backward": 128,
+  "act_data_pkt_fwd": 5,
+  "min_seg_size_forward": 20,
+  "Active Mean": 1000,
+  "Active Std": 100,
+  "Active Max": 1200,
+  "Active Min": 800,
+  "Idle Mean": 300,
+  "Idle Std": 50,
+  "Idle Max": 400,
+  "Idle Min": 200
+      };
+
+      responseDiv.innerHTML = "⏳ Sending request...";
+
+      try {
+        const res = await fetch("http://localhost:5000/api/detect", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer b9f246d7-eb21-4add-8772-6096c3181a88"
+          },
+          body: JSON.stringify(data)
+        });
+
+        const json = await res.json();
+
+        if (json.result) {
+          const color = json.result.toLowerCase() === "ddos" ? "red" : "green";
+          responseDiv.innerHTML = `
+            🚨 Detection Result: <span style="color:${color};">${json.result.toUpperCase()}</span><br>
+            📊 Confidence: ${json.confidence ?? "N/A"}<br>
+            🌐 Source IP: ${json.ip ?? "N/A"}
+          `;
+        } else {
+          responseDiv.innerHTML = `⚠️ Unexpected response: ${JSON.stringify(json)}`;
+        }
+
+      } catch (error) {
+        responseDiv.innerHTML = `<span style="color: red;">❌ Error: ${error.message}</span>`;
+      }
+    }
+  </script>
+
+</body>
+</html>

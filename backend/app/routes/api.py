@@ -241,3 +241,45 @@ def update_settings():
 
     db.session.commit()
     return jsonify({"message": "Settings updated successfully"})
+
+@api_bp.route("/api/sample_logs", methods=["GET"])
+def sample_logs():
+    return jsonify([
+        {
+            "ip": "192.168.0.101",
+            "datetime": "2025-04-10T14:30:00",
+            "status": "DDoS",
+            "confidence": 0.96,
+            "details": "Simulated TCP SYN flood from IP"
+        },
+        {
+            "ip": "10.0.0.45",
+            "datetime": "2025-04-10T14:45:00",
+            "status": "Safe",
+            "confidence": 0.85,
+            "details": "Normal user activity"
+        },
+        {
+            "ip": "192.168.0.202",
+            "datetime": "2025-04-10T15:00:00",
+            "status": "DDoS",
+            "confidence": 0.91,
+            "details": "UDP amplification attempt"
+        }
+    ])
+
+import json
+
+@api_bp.route("/api/chatbot", methods=["POST"])
+def chatbot():
+    user_input = request.json.get("message", "").lower()
+
+    with open("chatbot_responses.json") as f:
+        responses = json.load(f)
+
+    for key, value in responses["faq"].items():
+        if key in user_input:
+            return jsonify({"response": value})
+
+    return jsonify({"response": responses.get("fallback")})
+

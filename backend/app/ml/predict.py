@@ -5,9 +5,16 @@ import pandas as pd
 model = joblib.load("app/ml/model.pkl")
 scaler = joblib.load("app/ml/scaler.pkl")
 
+# def predict_ddos(data: dict):
+#     # Directly convert to DataFrame with column names
+#     df = pd.DataFrame([data])
+
 def predict_ddos(data: dict):
-    # Directly convert to DataFrame with column names
-    df = pd.DataFrame([data])
+    # 👇 Simulate a DDoS result for now
+    return {
+        "label": 1,
+        "confidence": 0.97
+    }
 
     # Scale and predict
     X = scaler.transform(df)
